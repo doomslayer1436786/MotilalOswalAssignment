@@ -1,0 +1,208 @@
+### Kafka Pipeline Sample Requests
+
+# Variables
+@baseUrl = http://localhost:8080
+@apiUrl = http://localhost:8082
+
+### Health Check - Producer
+GET {{baseUrl}}/health
+
+### Health Check - API
+GET {{apiUrl}}/health
+
+### Health Check - Consumer Metrics
+GET http://localhost:8081/health
+
+### Metrics - Producer
+GET {{baseUrl}}/metrics
+
+### Metrics - Consumer
+GET http://localhost:8081/metrics
+
+### Metrics - API
+GET {{apiUrl}}/metrics
+
+### 1. UserCreated Event
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440001",
+  "type": "UserCreated",
+  "timestamp": "2025-01-11T12:00:00Z",
+  "data": {
+    "userId": "user-123",
+    "name": "Alice Example",
+    "email": "alice@example.com",
+    "createdAt": "2025-01-11T12:00:00Z"
+  }
+}
+
+### 2. OrderPlaced Event
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440002",
+  "type": "OrderPlaced",
+  "timestamp": "2025-01-11T12:01:00Z",
+  "data": {
+    "orderId": "order-456",
+    "userId": "user-123",
+    "total": 123.45,
+    "createdAt": "2025-01-11T12:01:00Z"
+  }
+}
+
+### 3. PaymentSettled Event
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440003",
+  "type": "PaymentSettled",
+  "timestamp": "2025-01-11T12:02:00Z",
+  "data": {
+    "orderId": "order-456",
+    "status": "settled",
+    "amount": 123.45,
+    "settledAt": "2025-01-11T12:02:00Z"
+  }
+}
+
+### 4. InventoryAdjusted Event
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440004",
+  "type": "InventoryAdjusted",
+  "timestamp": "2025-01-11T12:03:00Z",
+  "data": {
+    "sku": "sku-789",
+    "delta": -2,
+    "reason": "order",
+    "adjustedAt": "2025-01-11T12:03:00Z"
+  }
+}
+
+### 5. Get User with Recent Orders
+GET {{apiUrl}}/users/user-123
+
+### 6. Get Order with Payment Status
+GET {{apiUrl}}/orders/order-456
+
+### 7. Test DLQ - Malformed JSON Event (Missing data field)
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440005",
+  "type": "UserCreated",
+  "timestamp": "2025-01-11T12:04:00Z"
+}
+
+### 8. Test DLQ - Invalid Event Type
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440006",
+  "type": "InvalidEvent",
+  "timestamp": "2025-01-11T12:05:00Z",
+  "data": {
+    "someField": "someValue"
+  }
+}
+
+### 9. Test DLQ - OrderPlaced with Missing UserId (DB Constraint Violation)
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440007",
+  "type": "OrderPlaced",
+  "timestamp": "2025-01-11T12:06:00Z",
+  "data": {
+    "orderId": "order-999",
+    "userId": "non-existent-user",
+    "total": 99.99,
+    "createdAt": "2025-01-11T12:06:00Z"
+  }
+}
+
+### 10. Test Idempotency - Send Same UserCreated Event Twice
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440008",
+  "type": "UserCreated",
+  "timestamp": "2025-01-11T12:07:00Z",
+  "data": {
+    "userId": "user-999",
+    "name": "Test User",
+    "email": "test@example.com",
+    "createdAt": "2025-01-11T12:07:00Z"
+  }
+}
+
+### 11. Send Same Event Again (Should Not Create Duplicate)
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440008",
+  "type": "UserCreated",
+  "timestamp": "2025-01-11T12:07:00Z",
+  "data": {
+    "userId": "user-999",
+    "name": "Test User Updated",
+    "email": "test.updated@example.com",
+    "createdAt": "2025-01-11T12:07:00Z"
+  }
+}
+
+### 12. Verify User Was Updated (Not Duplicated)
+GET {{apiUrl}}/users/user-999
+
+### 13. Create Additional Orders for User-123
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440009",
+  "type": "OrderPlaced",
+  "timestamp": "2025-01-11T12:08:00Z",
+  "data": {
+    "orderId": "order-457",
+    "userId": "user-123",
+    "total": 67.89,
+    "createdAt": "2025-01-11T12:08:00Z"
+  }
+}
+
+### 14. Another Order
+POST {{baseUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440010",
+  "type": "OrderPlaced",
+  "timestamp": "2025-01-11T12:09:00Z",
+  "data": {
+    "orderId": "order-458",
+    "userId": "user-123",
+    "total": 234.56,
+    "createdAt": "2025-01-11T12:09:00Z"
+  }
+}
+
+### 15. Verify User Has Multiple Orders (Should Show Last 5)
+GET {{apiUrl}}/users/user-123
+
+### 16. Test Non-existent User
+GET {{apiUrl}}/users/non-existent-user
+
+### 17. Test Non-existent Order
+GET {{apiUrl}}/orders/non-existent-order

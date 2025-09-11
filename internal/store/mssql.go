@@ -1,0 +1,198 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	_ "github.com/denisenkom/go-mssqldb"
+	"go.uber.org/zap"
+)
+
+type MSSQLStore struct {
+	db     *sql.DB
+	logger *zap.Logger
+}
+
+func NewMSSQLStore(connStr string, logger *zap.Logger) (*MSSQLStore, error) {
+	db, err := sql.Open("mssql", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Test connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return &MSSQLStore{
+		db:     db,
+		logger: logger,
+	}, nil
+}
+
+func (s *MSSQLStore) Close() error {
+	return s.db.Close()
+}
+
+// UpsertUser creates or updates a user record
+func (s *MSSQLStore) UpsertUser(ctx context.Context, user *User) error {
+	query := `
+		IF EXISTS (SELECT 1 FROM users WHERE user_id = ?)
+			UPDATE users SET name = ?, email = ?, updated_at = ? WHERE user_id = ?
+		ELSE
+			INSERT INTO users (user_id, name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		user.UserID, user.Name, user.Email, user.UpdatedAt, user.UserID,
+		user.UserID, user.Name, user.Email, user.CreatedAt, user.UpdatedAt,
+	)
+
+	return err
+}
+
+// UpsertOrder creates or updates an order record
+func (s *MSSQLStore) UpsertOrder(ctx context.Context, order *Order) error {
+	query := `
+		IF EXISTS (SELECT 1 FROM orders WHERE order_id = @order_id)
+			UPDATE orders SET user_id = @user_id, total = @total, status = @status, updated_at = @updated_at WHERE order_id = @order_id
+		ELSE
+			INSERT INTO orders (order_id, user_id, total, status, created_at, updated_at) VALUES (@order_id, @user_id, @total, @status, @created_at, @updated_at)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		sql.Named("order_id", order.OrderID),
+		sql.Named("user_id", order.UserID),
+		sql.Named("total", order.Total),
+		sql.Named("status", order.Status),
+		sql.Named("created_at", order.CreatedAt),
+		sql.Named("updated_at", order.UpdatedAt),
+	)
+
+	return err
+}
+
+// UpsertPayment creates or updates a payment record
+func (s *MSSQLStore) UpsertPayment(ctx context.Context, payment *Payment) error {
+	query := `
+		IF EXISTS (SELECT 1 FROM payments WHERE order_id = @order_id)
+			UPDATE payments SET status = @status, amount = @amount, settled_at = @settled_at, updated_at = @updated_at WHERE order_id = @order_id
+		ELSE
+			INSERT INTO payments (order_id, status, amount, settled_at, updated_at) VALUES (@order_id, @status, @amount, @settled_at, @updated_at)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		sql.Named("order_id", payment.OrderID),
+		sql.Named("status", payment.Status),
+		sql.Named("amount", payment.Amount),
+		sql.Named("settled_at", payment.SettledAt),
+		sql.Named("updated_at", payment.UpdatedAt),
+	)
+
+	return err
+}
+
+// UpsertInventory creates or updates an inventory record
+func (s *MSSQLStore) UpsertInventory(ctx context.Context, inventory *Inventory) error {
+	query := `
+		IF EXISTS (SELECT 1 FROM inventory WHERE sku = @sku)
+			UPDATE inventory SET quantity = quantity + @quantity, last_adjusted_at = @last_adjusted_at WHERE sku = @sku
+		ELSE
+			INSERT INTO inventory (sku, quantity, last_adjusted_at) VALUES (@sku, @quantity, @last_adjusted_at)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		sql.Named("sku", inventory.SKU),
+		sql.Named("quantity", inventory.Quantity),
+		sql.Named("last_adjusted_at", inventory.LastAdjustedAt),
+	)
+
+	return err
+}
+
+// GetUser retrieves a user by ID
+func (s *MSSQLStore) GetUser(ctx context.Context, userID string) (*User, error) {
+	query := `SELECT user_id, name, email, created_at, updated_at FROM users WHERE user_id = ?`
+
+	row := s.db.QueryRowContext(ctx, query, userID)
+
+	user := &User{}
+	err := row.Scan(&user.UserID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// GetUserRecentOrders retrieves the last 5 orders for a user
+func (s *MSSQLStore) GetUserRecentOrders(ctx context.Context, userID string) ([]*Order, error) {
+	query := `
+		SELECT TOP 5 order_id, user_id, total, status, created_at, updated_at 
+		FROM orders 
+		WHERE user_id = ? 
+		ORDER BY created_at DESC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*Order
+	for rows.Next() {
+		order := &Order{}
+		err := rows.Scan(&order.OrderID, &order.UserID, &order.Total, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// GetOrder retrieves an order by ID
+func (s *MSSQLStore) GetOrder(ctx context.Context, orderID string) (*Order, error) {
+	query := `SELECT order_id, user_id, total, status, created_at, updated_at FROM orders WHERE order_id = ?`
+
+	row := s.db.QueryRowContext(ctx, query, orderID)
+
+	order := &Order{}
+	err := row.Scan(&order.OrderID, &order.UserID, &order.Total, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return order, nil
+}
+
+// GetPayment retrieves a payment by order ID
+func (s *MSSQLStore) GetPayment(ctx context.Context, orderID string) (*Payment, error) {
+	query := `SELECT order_id, status, amount, settled_at, updated_at FROM payments WHERE order_id = ?`
+
+	row := s.db.QueryRowContext(ctx, query, orderID)
+
+	payment := &Payment{}
+	err := row.Scan(&payment.OrderID, &payment.Status, &payment.Amount, &payment.SettledAt, &payment.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return payment, nil
+}
