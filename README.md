@@ -40,7 +40,7 @@ The pipeline supports 4 event types:
 ### 1. Clone and Build
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/doomslayer1436786/MotilalOswalAssignment.git
 cd kafka-pipeline
 ```
 
