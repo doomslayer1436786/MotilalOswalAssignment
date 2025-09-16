@@ -44,6 +44,15 @@ type InventoryAdjustedData struct {
 	AdjustedAt time.Time `json:"adjustedAt"`
 }
 
+type ProductReviewData struct {
+	ReviewID    string    `json:"reviewId"`
+	ProductName string    `json:"productName"`
+	Username    string    `json:"username"`
+	Rating      int       `json:"rating"`
+	Remarks     string    `json:"remarks"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 // Database models
 type User struct {
 	UserID    string    `json:"userId" db:"user_id"`
@@ -74,6 +83,16 @@ type Inventory struct {
 	SKU            string    `json:"sku" db:"sku"`
 	Quantity       int       `json:"quantity" db:"quantity"`
 	LastAdjustedAt time.Time `json:"lastAdjustedAt" db:"last_adjusted_at"`
+}
+
+type ProductReview struct {
+	ReviewID    string    `json:"reviewId" db:"review_id"`
+	ProductName string    `json:"productName" db:"product_name"`
+	Username    string    `json:"username" db:"username"`
+	Rating      int       `json:"rating" db:"rating"`
+	Remarks     string    `json:"remarks" db:"remarks"`
+	CreatedAt   time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt   time.Time `json:"updatedAt" db:"updated_at"`
 }
 
 // DLQMessage represents a message stored in the dead letter queue

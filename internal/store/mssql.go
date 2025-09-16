@@ -255,3 +255,62 @@ func (s *MSSQLStore) GetPayment(ctx context.Context, orderID string) (*Payment, 
 
 	return payment, nil
 }
+
+func (s *MSSQLStore) UpsertProductReview(ctx context.Context, review *ProductReview) error {
+	query := `
+		IF EXISTS (SELECT 1 FROM product_reviews WHERE review_id = ?)
+			UPDATE product_reviews 
+			SET product_name = ?, username = ?, rating = ?, remarks = ?, updated_at = ? 
+			WHERE review_id = ?
+		ELSE
+			INSERT INTO product_reviews (review_id, product_name, username, rating, remarks, created_at, updated_at) 
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		review.ReviewID, review.ProductName, review.Username, review.Rating, review.Remarks, review.UpdatedAt, review.ReviewID,
+		review.ReviewID, review.ProductName, review.Username, review.Rating, review.Remarks, review.CreatedAt, review.UpdatedAt,
+	)
+	return err
+}
+
+// GetProductReview retrieves a product review by ID
+func (s *MSSQLStore) GetProductReview(ctx context.Context, reviewID string) (*ProductReview, error) {
+	query := `SELECT review_id, product_name, username, rating, remarks, created_at, updated_at FROM product_reviews WHERE review_id = ?`
+
+	row := s.db.QueryRowContext(ctx, query, reviewID)
+
+	review := &ProductReview{}
+	err := row.Scan(&review.ReviewID, &review.ProductName, &review.Username, &review.Rating, &review.Remarks, &review.CreatedAt, &review.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return review, nil
+}
+
+// GetProductReviewsByProduct retrieves all reviews for a specific product
+func (s *MSSQLStore) GetProductReviewsByProduct(ctx context.Context, productName string) ([]*ProductReview, error) {
+	query := `SELECT review_id, product_name, username, rating, remarks, created_at, updated_at FROM product_reviews WHERE product_name = ? ORDER BY created_at DESC`
+
+	rows, err := s.db.QueryContext(ctx, query, productName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reviews []*ProductReview
+	for rows.Next() {
+		review := &ProductReview{}
+		err := rows.Scan(&review.ReviewID, &review.ProductName, &review.Username, &review.Rating, &review.Remarks, &review.CreatedAt, &review.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		reviews = append(reviews, review)
+	}
+
+	return reviews, nil
+}

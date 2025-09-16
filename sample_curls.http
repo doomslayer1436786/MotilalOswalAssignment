@@ -206,3 +206,72 @@ GET {{apiUrl}}/users/non-existent-user
 
 ### 17. Test Non-existent Order
 GET {{apiUrl}}/orders/non-existent-order
+
+### 18. Create Product Review Event
+POST {{producerUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440030",
+  "type": "ProductReview",
+  "timestamp": "2025-01-11T12:00:00Z",
+  "data": {
+    "reviewId": "review-001",
+    "productName": "iPhone 15",
+    "username": "john_doe",
+    "rating": 5,
+    "remarks": "Excellent phone with great camera quality!",
+    "createdAt": "2025-01-11T12:00:00Z"
+  }
+}
+
+### 19. Create Another Product Review
+POST {{producerUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440031",
+  "type": "ProductReview",
+  "timestamp": "2025-01-11T12:05:00Z",
+  "data": {
+    "reviewId": "review-002",
+    "productName": "iPhone 15",
+    "username": "jane_smith",
+    "rating": 4,
+    "remarks": "Good phone but battery could be better",
+    "createdAt": "2025-01-11T12:05:00Z"
+  }
+}
+
+### 20. Create Review for Different Product
+POST {{producerUrl}}/produce
+Content-Type: application/json
+
+{
+  "eventId": "550e8400-e29b-41d4-a716-446655440032",
+  "type": "ProductReview",
+  "timestamp": "2025-01-11T12:10:00Z",
+  "data": {
+    "reviewId": "review-003",
+    "productName": "Samsung Galaxy S24",
+    "username": "bob_wilson",
+    "rating": 3,
+    "remarks": "Decent phone, average performance",
+    "createdAt": "2025-01-11T12:10:00Z"
+  }
+}
+
+### 21. Get Product Review by ID
+GET {{apiUrl}}/reviews/review-001
+
+### 22. Get All Reviews for iPhone 15
+GET {{apiUrl}}/products/iPhone 15/reviews
+
+### 23. Get All Reviews for Samsung Galaxy S24
+GET {{apiUrl}}/products/Samsung Galaxy S24/reviews
+
+### 24. Test Non-existent Review
+GET {{apiUrl}}/reviews/non-existent-review
+
+### 25. Test Non-existent Product Reviews
+GET {{apiUrl}}/products/NonExistentProduct/reviews

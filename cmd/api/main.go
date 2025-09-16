@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"kafka-pipeline/internal/store"
@@ -85,6 +86,14 @@ func main() {
 
 	mux.HandleFunc("/orders/", func(w http.ResponseWriter, r *http.Request) {
 		handleGetOrder(w, r, sqlStore, logger)
+	})
+
+	mux.HandleFunc("/reviews/", func(w http.ResponseWriter, r *http.Request) {
+		handleGetProductReview(w, r, sqlStore, logger)
+	})
+
+	mux.HandleFunc("/products/", func(w http.ResponseWriter, r *http.Request) {
+		handleGetProductReviewsByProduct(w, r, sqlStore, logger)
 	})
 
 	// Start server
@@ -237,4 +246,107 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func handleGetProductReview(w http.ResponseWriter, r *http.Request, sqlStore *store.MSSQLStore, logger *zap.Logger) {
+	start := time.Now()
+	defer func() {
+		httpLatencySeconds.WithLabelValues(r.Method, "/reviews/").Observe(time.Since(start).Seconds())
+	}()
+
+	if r.Method != http.MethodGet {
+		httpRequestsTotal.WithLabelValues(r.Method, "/reviews/", "405").Inc()
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract review ID from URL path
+	reviewID := extractIDFromPath(r.URL.Path, "/reviews/")
+	if reviewID == "" {
+		httpRequestsTotal.WithLabelValues(r.Method, "/reviews/", "400").Inc()
+		http.Error(w, "Review ID is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get product review
+	review, err := sqlStore.GetProductReview(ctx, reviewID)
+	if err != nil {
+		httpRequestsTotal.WithLabelValues(r.Method, "/reviews/", "500").Inc()
+		logger.Error("Failed to get product review", zap.String("reviewID", reviewID), zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if review == nil {
+		httpRequestsTotal.WithLabelValues(r.Method, "/reviews/", "404").Inc()
+		http.Error(w, "Review not found", http.StatusNotFound)
+		return
+	}
+
+	// Prepare response
+	response := map[string]interface{}{
+		"review": review,
+	}
+
+	// Set content type and write response
+	w.Header().Set("Content-Type", "application/json")
+	httpRequestsTotal.WithLabelValues(r.Method, "/reviews/", "200").Inc()
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode response", zap.Error(err))
+	}
+}
+
+func handleGetProductReviewsByProduct(w http.ResponseWriter, r *http.Request, sqlStore *store.MSSQLStore, logger *zap.Logger) {
+	start := time.Now()
+	defer func() {
+		httpLatencySeconds.WithLabelValues(r.Method, "/products/").Observe(time.Since(start).Seconds())
+	}()
+
+	if r.Method != http.MethodGet {
+		httpRequestsTotal.WithLabelValues(r.Method, "/products/", "405").Inc()
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract product name from URL path
+	productName := extractIDFromPath(r.URL.Path, "/products/")
+	if productName == "" {
+		httpRequestsTotal.WithLabelValues(r.Method, "/products/", "400").Inc()
+		http.Error(w, "Product name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Remove "/reviews" suffix if present
+	productName = strings.TrimSuffix(productName, "/reviews")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get product reviews
+	reviews, err := sqlStore.GetProductReviewsByProduct(ctx, productName)
+	if err != nil {
+		httpRequestsTotal.WithLabelValues(r.Method, "/products/", "500").Inc()
+		logger.Error("Failed to get product reviews", zap.String("productName", productName), zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare response
+	response := map[string]interface{}{
+		"productName": productName,
+		"reviews":     reviews,
+		"count":       len(reviews),
+	}
+
+	// Set content type and write response
+	w.Header().Set("Content-Type", "application/json")
+	httpRequestsTotal.WithLabelValues(r.Method, "/products/", "200").Inc()
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode response", zap.Error(err))
+	}
 }

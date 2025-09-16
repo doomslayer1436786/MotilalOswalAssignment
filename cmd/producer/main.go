@@ -169,6 +169,7 @@ func validateEvent(event map[string]interface{}) error {
 		"OrderPlaced":       true,
 		"PaymentSettled":    true,
 		"InventoryAdjusted": true,
+		"ProductReview":     true,
 	}
 
 	if !validTypes[eventType] {
@@ -219,6 +220,19 @@ func validateEvent(event map[string]interface{}) error {
 		}
 		if _, ok := data["delta"]; !ok {
 			return fmt.Errorf("delta is required for InventoryAdjusted event")
+		}
+	case "ProductReview":
+		if _, ok := data["reviewId"]; !ok {
+			return fmt.Errorf("reviewId is required for ProductReview event")
+		}
+		if _, ok := data["productName"]; !ok {
+			return fmt.Errorf("productName is required for ProductReview event")
+		}
+		if _, ok := data["username"]; !ok {
+			return fmt.Errorf("username is required for ProductReview event")
+		}
+		if _, ok := data["rating"]; !ok {
+			return fmt.Errorf("rating is required for ProductReview event")
 		}
 	}
 

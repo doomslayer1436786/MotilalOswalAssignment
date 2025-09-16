@@ -239,6 +239,18 @@ func processEventByType(ctx context.Context, event map[string]interface{}, sqlSt
 		}
 		return sqlStore.UpsertInventory(ctx, inventory)
 
+	case "ProductReview":
+		review := &store.ProductReview{
+			ReviewID:    data["reviewId"].(string),
+			ProductName: data["productName"].(string),
+			Username:    data["username"].(string),
+			Rating:      parseInt(data["rating"]),
+			Remarks:     data["remarks"].(string),
+			CreatedAt:   parseTime(data["createdAt"]),
+			UpdatedAt:   time.Now(),
+		}
+		return sqlStore.UpsertProductReview(ctx, review)
+
 	default:
 		return fmt.Errorf("unknown event type: %s", eventType)
 	}

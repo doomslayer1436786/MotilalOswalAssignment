@@ -112,6 +112,11 @@ func (p *Producer) extractKey(event interface{}) (string, error) {
 			return sku, nil
 		}
 		return "", fmt.Errorf("sku not found in InventoryAdjusted event")
+	case "ProductReview":
+		if reviewID, ok := data["reviewId"].(string); ok {
+			return reviewID, nil
+		}
+		return "", fmt.Errorf("reviewId not found in ProductReview event")
 	default:
 		return "", fmt.Errorf("unknown event type: %s", eventType)
 	}
