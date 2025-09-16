@@ -59,19 +59,40 @@ func (s *MSSQLStore) UpsertUser(ctx context.Context, user *User) error {
 // UpsertOrder creates or updates an order record
 func (s *MSSQLStore) UpsertOrder(ctx context.Context, order *Order) error {
 	query := `
-		IF EXISTS (SELECT 1 FROM orders WHERE order_id = @order_id)
-			UPDATE orders SET user_id = @user_id, total = @total, status = @status, updated_at = @updated_at WHERE order_id = @order_id
+		IF EXISTS (SELECT 1 FROM orders WHERE order_id = ?)
+		BEGIN
+			UPDATE orders
+			SET user_id = ?,
+				total = ?,
+				status = ?,
+				updated_at = ?
+			WHERE order_id = ?
+		END
 		ELSE
-			INSERT INTO orders (order_id, user_id, total, status, created_at, updated_at) VALUES (@order_id, @user_id, @total, @status, @created_at, @updated_at)
+		BEGIN
+			INSERT INTO orders (order_id, user_id, total, status, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+		END
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		sql.Named("order_id", order.OrderID),
-		sql.Named("user_id", order.UserID),
-		sql.Named("total", order.Total),
-		sql.Named("status", order.Status),
-		sql.Named("created_at", order.CreatedAt),
-		sql.Named("updated_at", order.UpdatedAt),
+		// For IF EXISTS
+		order.OrderID,
+
+		// For UPDATE
+		order.UserID,
+		order.Total,
+		order.Status,
+		order.UpdatedAt,
+		order.OrderID, // WHERE order_id = ?
+
+		// For INSERT
+		order.OrderID,
+		order.UserID,
+		order.Total,
+		order.Status,
+		order.CreatedAt,
+		order.UpdatedAt,
 	)
 
 	return err
@@ -80,18 +101,39 @@ func (s *MSSQLStore) UpsertOrder(ctx context.Context, order *Order) error {
 // UpsertPayment creates or updates a payment record
 func (s *MSSQLStore) UpsertPayment(ctx context.Context, payment *Payment) error {
 	query := `
-		IF EXISTS (SELECT 1 FROM payments WHERE order_id = @order_id)
-			UPDATE payments SET status = @status, amount = @amount, settled_at = @settled_at, updated_at = @updated_at WHERE order_id = @order_id
+		IF EXISTS (SELECT 1 FROM payments WHERE order_id = ?)
+		BEGIN
+			UPDATE payments
+			SET status = ?,
+				amount = ?,
+				settled_at = ?,
+				updated_at = ?
+			WHERE order_id = ?
+		END
 		ELSE
-			INSERT INTO payments (order_id, status, amount, settled_at, updated_at) VALUES (@order_id, @status, @amount, @settled_at, @updated_at)
+		BEGIN
+			INSERT INTO payments (order_id, status, amount, settled_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)
+		END
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		sql.Named("order_id", payment.OrderID),
-		sql.Named("status", payment.Status),
-		sql.Named("amount", payment.Amount),
-		sql.Named("settled_at", payment.SettledAt),
-		sql.Named("updated_at", payment.UpdatedAt),
+		// For IF EXISTS
+		payment.OrderID,
+
+		// For UPDATE
+		payment.Status,
+		payment.Amount,
+		payment.SettledAt,
+		payment.UpdatedAt,
+		payment.OrderID, // WHERE order_id = ?
+
+		// For INSERT
+		payment.OrderID,
+		payment.Status,
+		payment.Amount,
+		payment.SettledAt,
+		payment.UpdatedAt,
 	)
 
 	return err
@@ -100,16 +142,33 @@ func (s *MSSQLStore) UpsertPayment(ctx context.Context, payment *Payment) error 
 // UpsertInventory creates or updates an inventory record
 func (s *MSSQLStore) UpsertInventory(ctx context.Context, inventory *Inventory) error {
 	query := `
-		IF EXISTS (SELECT 1 FROM inventory WHERE sku = @sku)
-			UPDATE inventory SET quantity = quantity + @quantity, last_adjusted_at = @last_adjusted_at WHERE sku = @sku
+		IF EXISTS (SELECT 1 FROM inventory WHERE sku = ?)
+		BEGIN
+			UPDATE inventory
+			SET quantity = quantity + ?,
+				last_adjusted_at = ?
+			WHERE sku = ?
+		END
 		ELSE
-			INSERT INTO inventory (sku, quantity, last_adjusted_at) VALUES (@sku, @quantity, @last_adjusted_at)
+		BEGIN
+			INSERT INTO inventory (sku, quantity, last_adjusted_at)
+			VALUES (?, ?, ?)
+		END
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		sql.Named("sku", inventory.SKU),
-		sql.Named("quantity", inventory.Quantity),
-		sql.Named("last_adjusted_at", inventory.LastAdjustedAt),
+		// For IF EXISTS
+		inventory.SKU,
+
+		// For UPDATE
+		inventory.Quantity,
+		inventory.LastAdjustedAt,
+		inventory.SKU, // WHERE sku = ?
+
+		// For INSERT
+		inventory.SKU,
+		inventory.Quantity,
+		inventory.LastAdjustedAt,
 	)
 
 	return err
